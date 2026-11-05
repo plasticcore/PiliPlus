@@ -8,7 +8,10 @@ import 'package:PiliPlus/common/widgets/route_aware_mixin.dart';
 import 'package:PiliPlus/common/widgets/scale_app.dart';
 import 'package:PiliPlus/common/widgets/scroll_behavior.dart';
 import 'package:PiliPlus/http/init.dart';
+import 'package:PiliPlus/models/common/nav_bar_config.dart';
 import 'package:PiliPlus/models/common/theme/theme_color_type.dart';
+import 'package:PiliPlus/pages/main/controller.dart';
+import 'package:PiliPlus/plugin/pl_player/controller.dart';
 import 'package:PiliPlus/plugin/pl_player/utils/fullscreen.dart';
 import 'package:PiliPlus/router/app_pages.dart';
 import 'package:PiliPlus/services/account_service.dart';
@@ -230,10 +233,22 @@ void main() async {
 }
 
 KeyEventResult _onKeyEvent(KeyEvent event) {
-  if (event is KeyDownEvent && event.logicalKey == .escape) {
+  if (event is! KeyDownEvent) return .ignored;
+
+  if (event.logicalKey == .escape) {
     _onBack();
     return .handled;
   }
+
+  // Ctrl+H 或 Alt+Home：全局回到主页
+  final hw = HardwareKeyboard.instance;
+  final key = event.logicalKey;
+  if ((key == .keyH && hw.isControlPressed && !hw.isShiftPressed) ||
+      (key == .home && hw.isAltPressed)) {
+    _toHome();
+    return .handled;
+  }
+
   return .ignored;
 }
 
@@ -254,6 +269,33 @@ void _onBack() {
   final navigator = Get.key.currentState!;
   if (navigator.canPop()) {
     navigator.pop();
+  }
+}
+
+void _toHome() {
+  // 1) 关掉弹窗 / 底部面板
+  if (SmartDialog.checkExist()) {
+    SmartDialog.dismiss();
+  }
+
+  // 2) 先退出全屏 / 画中画，避免窗口卡在全屏
+  final player = PlPlayerController.instance;
+  if (player != null) {
+    if (player.isDesktopPip) {
+      player.exitDesktopPip();
+    } else if (player.isFullScreen.value) {
+      player.triggerFullScreen(status: false);
+    }
+  }
+
+  // 3) 回到根路由（主框架）
+  Get.until((route) => route.isFirst);
+
+  // 4) 切回「首页」tab
+  if (Get.isRegistered<MainController>()) {
+    final main = Get.find<MainController>();
+    final homeIndex = main.navigationBars.indexOf(NavigationBarType.home);
+    if (homeIndex != -1) main.setIndex(homeIndex);
   }
 }
 
