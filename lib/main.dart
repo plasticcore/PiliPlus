@@ -235,21 +235,40 @@ void main() async {
 KeyEventResult _onKeyEvent(KeyEvent event) {
   if (event is! KeyDownEvent) return .ignored;
 
-  if (event.logicalKey == .escape) {
+  final key = event.logicalKey;
+  final hw = HardwareKeyboard.instance;
+
+  // Esc：返回
+  if (key == .escape) {
     _onBack();
     return .handled;
   }
 
-  // Ctrl+H 或 Alt+Home：全局回到主页
-  final hw = HardwareKeyboard.instance;
-  final key = event.logicalKey;
-  if ((key == .keyH && hw.isControlPressed && !hw.isShiftPressed) ||
-      (key == .home && hw.isAltPressed)) {
-    _toHome();
+  // Alt+Home：回到首页
+  if (key == .home && hw.isAltPressed) {
+    _toTab(NavigationBarType.home, '/home');
     return .handled;
   }
 
-  return .ignored;
+  if (!hw.isControlPressed || hw.isShiftPressed) {
+    return .ignored;
+  }
+
+  // Ctrl + 字母：全局页面跳转
+  if (key == .keyH) {
+    _toTab(NavigationBarType.home, '/home');
+  } else if (key == .keyD) {
+    _toTab(NavigationBarType.dynamics, '/dynamics');
+  } else if (key == .keyM) {
+    _toMinePage();
+  } else if (key == .keyJ) {
+    _toPage('/history');
+  } else if (key == .keyL) {
+    _toPage('/download');
+  } else {
+    return .ignored;
+  }
+  return .handled;
 }
 
 void _onBack() {
@@ -272,13 +291,12 @@ void _onBack() {
   }
 }
 
-void _toHome() {
-  // 1) 关掉弹窗 / 底部面板
+/// 跳转前的公共处理：关弹窗 → 退全屏/画中画 → 回主框架
+void _beforeNavigate() {
   if (SmartDialog.checkExist()) {
     SmartDialog.dismiss();
   }
 
-  // 2) 先退出全屏 / 画中画，避免窗口卡在全屏
   final player = PlPlayerController.instance;
   if (player != null) {
     if (player.isDesktopPip) {
@@ -288,15 +306,35 @@ void _toHome() {
     }
   }
 
-  // 3) 回到根路由（主框架）
   Get.until((route) => route.isFirst);
+}
 
-  // 4) 切回「首页」tab
+/// 切到主框架的某个 tab；该 tab 被隐藏时退回直接打开页面
+void _toTab(NavigationBarType type, String fallbackRoute) {
+  _beforeNavigate();
   if (Get.isRegistered<MainController>()) {
     final main = Get.find<MainController>();
-    final homeIndex = main.navigationBars.indexOf(NavigationBarType.home);
-    if (homeIndex != -1) main.setIndex(homeIndex);
+    final index = main.navigationBars.indexOf(type);
+    if (index != -1) {
+      main.setIndex(index);
+      return;
+    }
   }
+  Get.toNamed(fallbackRoute);
+}
+
+/// 我的（导航栏里没有「我的」时，会以带返回键的页面打开）
+void _toMinePage() {
+  _beforeNavigate();
+  if (Get.isRegistered<MainController>()) {
+    Get.find<MainController>().toMinePage();
+  }
+}
+
+/// 打开独立页面（观看记录 / 离线缓存）
+void _toPage(String route) {
+  _beforeNavigate();
+  Get.toNamed(route);
 }
 
 class MyApp extends StatelessWidget {
