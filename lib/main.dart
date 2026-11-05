@@ -316,7 +316,10 @@ void _toTab(NavigationBarType type, String fallbackRoute) {
     final main = Get.find<MainController>();
     final index = main.navigationBars.indexOf(type);
     if (index != -1) {
-      main.setIndex(index);
+      // 已经在该 tab 时不要再调 setIndex，否则会触发「再点一次刷新」
+      if (main.selectedIndex.value != index) {
+        main.setIndex(index);
+      }
       return;
     }
   }
@@ -326,8 +329,13 @@ void _toTab(NavigationBarType type, String fallbackRoute) {
 /// 我的（导航栏里没有「我的」时，会以带返回键的页面打开）
 void _toMinePage() {
   _beforeNavigate();
-  if (Get.isRegistered<MainController>()) {
-    Get.find<MainController>().toMinePage();
+  if (!Get.isRegistered<MainController>()) return;
+  final main = Get.find<MainController>();
+  final index = main.navigationBars.indexOf(NavigationBarType.mine);
+  if (index == -1) {
+    main.toMinePage(); // 导航栏没配「我的」→ 弹出带返回键的页面
+  } else if (main.selectedIndex.value != index) {
+    main.setIndex(index);
   }
 }
 
