@@ -265,6 +265,8 @@ KeyEventResult _onKeyEvent(KeyEvent event) {
     _toPage('/history');
   } else if (key == .keyL) {
     _toPage('/download');
+  } else if (key == .keyF) {
+    _toSearch();
   } else {
     return .ignored;
   }
@@ -291,8 +293,8 @@ void _onBack() {
   }
 }
 
-/// 跳转前的公共处理：关弹窗 → 退全屏/画中画 → 回主框架
-void _beforeNavigate() {
+/// 跳转前的公共处理：关弹窗 → 退全屏/画中画 →（可选）回主框架
+void _beforeNavigate({bool popToRoot = true}) {
   if (SmartDialog.checkExist()) {
     SmartDialog.dismiss();
   }
@@ -306,7 +308,9 @@ void _beforeNavigate() {
     }
   }
 
-  Get.until((route) => route.isFirst);
+  if (popToRoot) {
+    Get.until((route) => route.isFirst);
+  }
 }
 
 /// 切到主框架的某个 tab；该 tab 被隐藏时退回直接打开页面
@@ -343,6 +347,12 @@ void _toMinePage() {
 void _toPage(String route) {
   _beforeNavigate();
   Get.toNamed(route);
+}
+
+/// 打开搜索页：叠在当前页面之上，返回能回到原来的视频/列表
+void _toSearch() {
+  _beforeNavigate(popToRoot: false);
+  Get.toNamed('/search');
 }
 
 class MyApp extends StatelessWidget {
