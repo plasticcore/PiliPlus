@@ -56,7 +56,7 @@ dependencies:
       ref: develop
   canvas_danmaku:
     git:
-      url: https://github.com/bggRGjQaUbCoE/canvas_danmaku.git
+      url: https://github.com/plasticcore/canvas_danmaku.git
       ref: main
   catcher_2:
     git:
