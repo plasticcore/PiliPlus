@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:canvas_danmaku/utils/utils.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:PiliPlus/build_config.dart';
 import 'package:PiliPlus/common/constants.dart';
 import 'package:PiliPlus/common/widgets/back_detector.dart';
@@ -144,7 +146,8 @@ void main() async {
   SmartDialog.config.toast = SmartConfigToast(displayType: .onlyRefresh);
 
   FocusManager.instance.addEarlyKeyEventHandler(_onKeyEvent);
-
+  _dbgInit();
+  
   if (PlatformUtils.isMobile) {
     SystemChrome.setEnabledSystemUIMode(.edgeToEdge);
     SystemChrome.setSystemUIOverlayStyle(
@@ -230,6 +233,35 @@ void main() async {
       }
     }
   }
+}
+
+// ===== 临时诊断：每秒把 fps / 弹幕重绘次数 / 光栅耗时写入桌面 perf.log =====
+final _dbgFile = File(
+  '${Platform.environment['USERPROFILE']}\\Desktop\\perf.log',
+);
+int _dbgFrames = 0;
+int _dbgTickBase = 0;
+final _dbgSw = Stopwatch()..start();
+
+void _dbgInit() {
+  SchedulerBinding.instance.addTimingsCallback((timings) {
+    _dbgFrames += timings.length;
+    if (_dbgSw.elapsedMilliseconds < 1000) return;
+    final t = DmUtils.debugTicks;
+    var rasterMax = 0;
+    for (final e in timings) {
+      final ms = e.rasterDuration.inMilliseconds;
+      if (ms > rasterMax) rasterMax = ms;
+    }
+    _dbgFile.writeAsStringSync(
+      'fps=$_dbgFrames dmTick=${t - _dbgTickBase} raster=${rasterMax}ms\n',
+      mode: FileMode.append,
+      flush: true,
+    );
+    _dbgFrames = 0;
+    _dbgTickBase = t;
+    _dbgSw.reset();
+  });
 }
 
 KeyEventResult _onKeyEvent(KeyEvent event) {
