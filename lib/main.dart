@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'dart:ui' as ui;
 import 'package:canvas_danmaku/utils/utils.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:PiliPlus/build_config.dart';
@@ -235,31 +236,55 @@ void main() async {
   }
 }
 
-// ===== 临时诊断：每秒把 fps / 弹幕重绘次数 / 光栅耗时写入桌面 perf.log =====
+// ===== 临时诊断 v2：帧间隔分布 =====
 final _dbgFile = File(
   '${Platform.environment['USERPROFILE']}\\Desktop\\perf.log',
 );
 int _dbgFrames = 0;
 int _dbgTickBase = 0;
+int _dbgPrevTs = 0;
+int _dbgMinDelta = 999;
+int _dbgMaxDelta = 0;
 final _dbgSw = Stopwatch()..start();
-
 void _dbgInit() {
   SchedulerBinding.instance.addTimingsCallback((timings) {
     _dbgFrames += timings.length;
+
+    for (final e in timings) {
+      final ts = e.timestampInMicroseconds(ui.FramePhase.vsyncStart);
+      if (_dbgPrevTs != 0) {
+        final d = ((ts - _dbgPrevTs) / 1000).round();
+        if (d > 0 && d < 200) {
+          if (d < _dbgMinDelta) _dbgMinDelta = d;
+          if (d > _dbgMaxDelta) _dbgMaxDelta = d;
+        }
+      }
+      _dbgPrevTs = ts;
+    }
+
     if (_dbgSw.elapsedMilliseconds < 1000) return;
+
     final t = DmUtils.debugTicks;
     var rasterMax = 0;
     for (final e in timings) {
       final ms = e.rasterDuration.inMilliseconds;
       if (ms > rasterMax) rasterMax = ms;
     }
+    final now = DateTime.now();
+    final ts =
+        '${now.hour.toString().padLeft(2, '0')}:'
+        '${now.minute.toString().padLeft(2, '0')}:'
+        '${now.second.toString().padLeft(2, '0')}';
     _dbgFile.writeAsStringSync(
-      'fps=$_dbgFrames dmTick=${t - _dbgTickBase} raster=${rasterMax}ms\n',
+      '$ts fps=$_dbgFrames dmTick=${t - _dbgTickBase} '
+      'raster=${rasterMax}ms dmin=$_dbgMinDelta dmax=$_dbgMaxDelta\n',
       mode: FileMode.append,
       flush: true,
     );
     _dbgFrames = 0;
     _dbgTickBase = t;
+    _dbgMinDelta = 999;
+    _dbgMaxDelta = 0;
     _dbgSw.reset();
   });
 }
